@@ -29,7 +29,7 @@ public class Usuario extends EntidadBase implements UserDetails {
     @Column(name = "nombre_usuario", nullable = false, length = 60)
     private String nombreUsuario;
 
-    @Column(name = "correo", length = 150)
+    @Column(name = "correo", nullable = false, length = 150)
     private String correo;
 
     @Column(name = "contrasena_hash", nullable = false)

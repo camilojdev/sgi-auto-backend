@@ -43,7 +43,7 @@ public class ConfiguracionSeguridad {
                         s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/api/autenticacion/ingresar",
+                                "/api/autenticacion/**",
                                 "/api/docs/**",
                                 "/api/swagger-ui/**",
                                 "/swagger-ui/**",

@@ -1,10 +1,7 @@
 package com.sgi.auto.usuarios.dto;
 
 import com.sgi.auto.usuarios.RolUsuario;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 
 public record UsuarioCrearDTO(
 
@@ -16,11 +13,15 @@ public record UsuarioCrearDTO(
         @Size(min = 4, max = 60, message = "El nombre de usuario debe tener entre 4 y 60 caracteres")
         String nombreUsuario,
 
+        @NotBlank(message = "El correo es obligatorio")
         @Email(message = "El correo no tiene un formato válido")
         String correo,
 
         @NotBlank(message = "La contraseña es obligatoria")
-        @Size(min = 8, message = "La contraseña debe tener al menos 8 caracteres")
+        @Pattern(
+                regexp = "^(?=.*[A-Z])(?=.*[0-9]).{8,}$",
+                message = "La contraseña debe tener al menos 8 caracteres, una mayúscula y un número"
+        )
         String contrasena,
 
         @NotNull(message = "El rol es obligatorio")
