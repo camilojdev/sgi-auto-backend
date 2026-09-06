@@ -71,3 +71,20 @@ logging:
   level:
     com.sgi.auto: INFO
     org.hibernate.SQL: WARN
+
+# ─────────────────────────────────────────
+# Mail
+# ─────────────────────────────────────────
+mail:
+  host: ${MAIL_HOST:smtp-relay.brevo.com}
+  port: ${MAIL_PORT:587}
+  username: ${MAIL_USERNAME:}
+  password: ${MAIL_PASSWORD:}
+  properties:
+    mail:
+      smtp:
+        auth: true
+        starttls:
+          enable: true
+        connectiontimeout: 5000
+        timeout: 5000
