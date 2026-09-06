@@ -20,4 +20,8 @@ public interface UsuarioRepositorio extends JpaRepository<Usuario, Long> {
     // Buscar por correo
     @Query("SELECT u FROM Usuario u WHERE u.correo = :correo AND u.eliminadoEn IS NULL")
     Optional<Usuario> buscarPorCorreo(@Param("correo") String correo);
+
+    // Buscar por nombre de usuario O correo (para login flexible)
+    @Query("SELECT u FROM Usuario u WHERE (u.nombreUsuario = :identificador OR u.correo = :identificador) AND u.eliminadoEn IS NULL")
+    Optional<Usuario> buscarPorUsuarioOCorreo(@Param("identificador") String identificador);
 }
