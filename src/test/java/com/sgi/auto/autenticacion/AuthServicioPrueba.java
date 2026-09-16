@@ -53,7 +53,7 @@ class AuthServicioPrueba {
     @DisplayName("Ingreso exitoso devuelve token JWT con el rol correcto")
     void ingresoExitoso_devuelveToken() {
         // Arrange
-        when(usuarioRepositorio.buscarPorNombreUsuario("admin"))
+        when(usuarioRepositorio.buscarPorUsuarioOCorreo("admin"))
                 .thenReturn(Optional.of(usuarioPrueba));
         when(jwtUtil.generarToken(anyString(), anyString(), anyMap()))
                 .thenReturn("token.jwt.firmado");
@@ -74,7 +74,7 @@ class AuthServicioPrueba {
     @Test
     @DisplayName("Credenciales incorrectas lanza BadCredentialsException")
     void credencialesIncorrectas_lanzaExcepcion() {
-        when(usuarioRepositorio.buscarPorNombreUsuario("admin"))
+        when(usuarioRepositorio.buscarPorUsuarioOCorreo("admin"))
                 .thenReturn(Optional.of(usuarioPrueba));
         doThrow(new BadCredentialsException("mal"))
                 .when(gestorAutenticacion).authenticate(any());
@@ -93,7 +93,7 @@ class AuthServicioPrueba {
     @DisplayName("Cuenta bloqueada lanza excepción sin intentar autenticar")
     void cuentaBloqueada_lanzaExcepcionSinAutenticar() {
         usuarioPrueba.setBloqueadoHasta(OffsetDateTime.now().plusMinutes(10));
-        when(usuarioRepositorio.buscarPorNombreUsuario("admin"))
+        when(usuarioRepositorio.buscarPorUsuarioOCorreo("admin"))
                 .thenReturn(Optional.of(usuarioPrueba));
 
         LoginSolicitudDTO solicitud = new LoginSolicitudDTO("admin", "cualquiera");
@@ -109,7 +109,7 @@ class AuthServicioPrueba {
     @Test
     @DisplayName("Cinco intentos fallidos activan el bloqueo de 15 minutos")
     void cincoIntentosFallidos_activanBloqueo() {
-        when(usuarioRepositorio.buscarPorNombreUsuario("admin"))
+        when(usuarioRepositorio.buscarPorUsuarioOCorreo("admin"))
                 .thenReturn(Optional.of(usuarioPrueba));
         doThrow(new BadCredentialsException("mal"))
                 .when(gestorAutenticacion).authenticate(any());
