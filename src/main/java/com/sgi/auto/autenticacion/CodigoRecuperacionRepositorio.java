@@ -13,14 +13,17 @@ public interface CodigoRecuperacionRepositorio extends JpaRepository<CodigoRecup
         SELECT c FROM CodigoRecuperacion c
         WHERE c.usuario.id = :usuarioId
           AND c.codigo = :codigo
+          AND c.tipo = :tipo
           AND c.usado = false
           AND c.expiraEn > :ahora
         ORDER BY c.creadoEn DESC
         """)
-    Optional<CodigoRecuperacion> buscarValido(
+    Optional<CodigoRecuperacion> buscarValidoPorTipo(
             @Param("usuarioId") Long usuarioId,
             @Param("codigo") String codigo,
+            @Param("tipo") TipoCodigoRecuperacion tipo,
             @Param("ahora") OffsetDateTime ahora);
 
-    Optional<CodigoRecuperacion> findFirstByUsuarioIdOrderByCreadoEnDesc(Long usuarioId);
+    Optional<CodigoRecuperacion> findFirstByUsuarioIdAndTipoOrderByCreadoEnDesc(
+            Long usuarioId, TipoCodigoRecuperacion tipo);
 }

@@ -26,6 +26,11 @@ spring:
       write-dates-as-timestamps: false
     default-property-inclusion: non_null
 
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+
   mail:
     host: ${MAIL_HOST:smtp-relay.brevo.com}
     port: ${MAIL_PORT:587}
@@ -85,3 +90,4 @@ logging:
   level:
     com.sgi.auto: INFO
     org.hibernate.SQL: WARN
+

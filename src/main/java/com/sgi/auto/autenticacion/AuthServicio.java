@@ -4,7 +4,6 @@ import com.sgi.auto.autenticacion.dto.LoginSolicitudDTO;
 import com.sgi.auto.autenticacion.dto.OlvideContrasenaDTO;
 import com.sgi.auto.autenticacion.dto.RestablecerContrasenaDTO;
 import com.sgi.auto.autenticacion.dto.TokenRespuestaDTO;
-import com.sgi.auto.compartido.EmailServicio;
 import com.sgi.auto.compartido.ReglaNegocioExcepcion;
 import com.sgi.auto.usuarios.Usuario;
 import com.sgi.auto.usuarios.UsuarioRepositorio;
@@ -18,9 +17,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.security.SecureRandom;
-import java.time.Duration;
-import java.time.OffsetDateTime;
 import java.util.Map;
 
 @Slf4j
@@ -31,17 +27,11 @@ public class AuthServicio {
     private final AuthenticationManager gestorAutenticacion;
     private final JwtUtil jwtUtil;
     private final UsuarioRepositorio usuarioRepositorio;
-    private final CodigoRecuperacionRepositorio codigoRecuperacionRepositorio;
-    private final EmailServicio emailServicio;
+    private final CodigoVerificacionServicio codigoVerificacionServicio;
     private final PasswordEncoder passwordEncoder;
-
-    private static final SecureRandom RANDOM = new SecureRandom();
-    private static final int MINUTOS_VALIDEZ_CODIGO = 15;
-    private static final int SEGUNDOS_ENTRE_SOLICITUDES = 60;
 
     @Transactional
     public TokenRespuestaDTO ingresar(LoginSolicitudDTO solicitud) {
-        // Acepta nombreUsuario o correo en el mismo campo.
         Usuario usuario = usuarioRepositorio
                 .buscarPorUsuarioOCorreo(solicitud.nombreUsuario())
                 .orElseThrow(() -> new BadCredentialsException("Credenciales incorrectas"));
@@ -52,9 +42,6 @@ public class AuthServicio {
         }
 
         try {
-            // Siempre se autentica con el nombreUsuario REAL ya resuelto
-            // arriba, sin importar si la persona escribió su usuario o
-            // su correo en el formulario de login.
             gestorAutenticacion.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             usuario.getNombreUsuario(),
@@ -91,46 +78,22 @@ public class AuthServicio {
                 permisos);
     }
 
-    /**
-     * Solicita un código de recuperación. Por seguridad, SIEMPRE responde
-     * igual (no revela si el usuario/correo existe o no en el sistema).
-     */
     @Transactional
     public void olvideContrasena(OlvideContrasenaDTO solicitud) {
         usuarioRepositorio.buscarPorUsuarioOCorreo(solicitud.identificador())
-                .ifPresent(usuario -> {
-                    codigoRecuperacionRepositorio
-                            .findFirstByUsuarioIdOrderByCreadoEnDesc(usuario.getId())
-                            .ifPresent(ultimo -> {
-                                long segundosDesdeUltimo = Duration.between(
-                                        ultimo.getCreadoEn(), OffsetDateTime.now()).getSeconds();
-                                if (segundosDesdeUltimo < SEGUNDOS_ENTRE_SOLICITUDES) {
-                                    throw new ReglaNegocioExcepcion(
-                                            "Ya se envió un código recientemente. Espera un momento antes de pedir otro.");
-                                }
-                            });
-
-                    String codigo = generarCodigo();
-
-                    CodigoRecuperacion nuevoCodigo = CodigoRecuperacion.builder()
-                            .usuario(usuario)
-                            .codigo(codigo)
-                            .expiraEn(OffsetDateTime.now().plusMinutes(MINUTOS_VALIDEZ_CODIGO))
-                            .build();
-                    codigoRecuperacionRepositorio.save(nuevoCodigo);
-
-                    String cuerpo = """
-                            <p>Hola %s,</p>
-                            <p>Tu código para restablecer tu contraseña es:</p>
-                            <h2>%s</h2>
-                            <p>Este código es válido por %d minutos. Si no solicitaste este código, ignora este correo.</p>
-                            """.formatted(usuario.getNombreCompleto(), codigo, MINUTOS_VALIDEZ_CODIGO);
-
-                    emailServicio.enviar(usuario.getCorreo(),
-                            "Código para restablecer tu contraseña", cuerpo);
-
-                    log.info("Código de recuperación generado para usuario id={}", usuario.getId());
-                });
+                .ifPresent(usuario -> codigoVerificacionServicio.generarYEnviar(
+                        usuario,
+                        TipoCodigoRecuperacion.RECUPERACION_CONTRASENA,
+                        usuario.getCorreo(),
+                        null,
+                        "Código para restablecer tu contraseña",
+                        """
+                        <p>Hola %s,</p>
+                        <p>Tu código para restablecer tu contraseña es:</p>
+                        <h2>%s</h2>
+                        <p>Este código es válido por %d minutos. Si no solicitaste este código, ignora este correo.</p>
+                        """
+                ));
     }
 
     @Transactional
@@ -139,22 +102,13 @@ public class AuthServicio {
                 .buscarPorUsuarioOCorreo(solicitud.identificador())
                 .orElseThrow(() -> new ReglaNegocioExcepcion("Código inválido o expirado"));
 
-        CodigoRecuperacion codigoValido = codigoRecuperacionRepositorio
-                .buscarValido(usuario.getId(), solicitud.codigo(), OffsetDateTime.now())
-                .orElseThrow(() -> new ReglaNegocioExcepcion("Código inválido o expirado"));
+        codigoVerificacionServicio.validarYConsumir(
+                usuario.getId(), solicitud.codigo(), TipoCodigoRecuperacion.RECUPERACION_CONTRASENA);
 
         usuario.setContrasenaHash(passwordEncoder.encode(solicitud.nuevaContrasena()));
         usuario.registrarIngresoExitoso();
         usuarioRepositorio.save(usuario);
 
-        codigoValido.setUsado(true);
-        codigoRecuperacionRepositorio.save(codigoValido);
-
         log.info("Contraseña restablecida para usuario id={}", usuario.getId());
-    }
-
-    private String generarCodigo() {
-        int numero = 100000 + RANDOM.nextInt(900000);
-        return String.valueOf(numero);
     }
 }
