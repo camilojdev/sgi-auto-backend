@@ -26,6 +26,15 @@ public class CodigoRecuperacion {
     @Column(name = "codigo", nullable = false, length = 6)
     private String codigo;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo", nullable = false, length = 30)
+    @Builder.Default
+    private TipoCodigoRecuperacion tipo = TipoCodigoRecuperacion.RECUPERACION_CONTRASENA;
+
+    // Solo se usa cuando tipo = CAMBIO_CORREO.
+    @Column(name = "correo_destino", length = 150)
+    private String correoDestino;
+
     @Column(name = "expira_en", nullable = false)
     private OffsetDateTime expiraEn;
 

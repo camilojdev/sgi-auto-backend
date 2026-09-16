@@ -40,6 +40,13 @@ public class Usuario extends EntidadBase implements UserDetails {
     @Column(name= "rol", nullable = false)
     private RolUsuario rol;
 
+    // ── Foto de perfil ─────────────────────────────────────────────
+    @Column(name = "foto_url", length = 500)
+    private String fotoUrl;
+
+    @Column(name = "foto_public_id", length = 200)
+    private String fotoPublicId;
+
     // ── Permisos granulares para CAJERA ──────────────────────────
     @Column(name = "puede_aplicar_descuento", nullable = false)
     @Builder.Default
