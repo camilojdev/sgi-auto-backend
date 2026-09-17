@@ -11,14 +11,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.sgi.auto.usuarios.dto.SolicitarCreacionDuenoDTO;
+import com.sgi.auto.usuarios.dto.ConfirmarCreacionDuenoDTO;
 import java.util.List;
 
-/**
- * Controlador de gestión de usuarios.
- * Todos los endpoints son exclusivos del rol DUEÑO.
- * RF-003, RF-004
- */
+
 @RestController
 @RequestMapping("/api/usuarios")
 @RequiredArgsConstructor
@@ -27,10 +25,6 @@ public class UsuarioControlador {
 
     private final UsuarioServicio usuarioServicio;
 
-    /**
-     * POST /api/usuarios
-     * RF-003 — Crear un nuevo usuario del sistema.
-     */
     @PostMapping
     public ResponseEntity<ApiRespuesta<UsuarioRespuestaDTO>> crear(
             @Valid @RequestBody UsuarioCrearDTO solicitud) {
@@ -50,28 +44,17 @@ public class UsuarioControlador {
         return ResponseEntity.ok(ApiRespuesta.exitoso(null, "Contraseña actualizada correctamente"));
     }
 
-    /**
-     * GET /api/usuarios
-     * Lista todos los usuarios activos del sistema.
-     */
     @GetMapping
     public ResponseEntity<ApiRespuesta<List<UsuarioRespuestaDTO>>> listarTodos() {
         return ResponseEntity.ok(ApiRespuesta.exitoso(usuarioServicio.listarTodos()));
     }
 
-    /**
-     * GET /api/usuarios/{id}
-     */
     @GetMapping("/{id}")
     public ResponseEntity<ApiRespuesta<UsuarioRespuestaDTO>> obtenerPorId(
             @PathVariable Long id) {
         return ResponseEntity.ok(ApiRespuesta.exitoso(usuarioServicio.obtenerPorId(id)));
     }
 
-    /**
-     * PATCH /api/usuarios/{id}/permisos
-     * RF-004 — Configurar permisos granulares de la cajera.
-     */
     @PatchMapping("/{id}/permisos")
     public ResponseEntity<ApiRespuesta<UsuarioRespuestaDTO>> actualizarPermisos(
             @PathVariable Long id,
@@ -82,22 +65,33 @@ public class UsuarioControlador {
                 ApiRespuesta.exitoso(actualizado, "Permisos actualizados correctamente"));
     }
 
-    /**
-     * DELETE /api/usuarios/{id}
-     * Desactiva el usuario (no lo elimina físicamente).
-     */
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiRespuesta<Void>> desactivar(@PathVariable Long id) {
         usuarioServicio.desactivar(id);
         return ResponseEntity.ok(ApiRespuesta.exitoso(null, "Usuario desactivado correctamente"));
     }
 
-    /**
-     * PATCH /api/usuarios/{id}/reactivar
-     */
     @PatchMapping("/{id}/reactivar")
     public ResponseEntity<ApiRespuesta<UsuarioRespuestaDTO>> reactivar(@PathVariable Long id) {
         UsuarioRespuestaDTO reactivado = usuarioServicio.reactivar(id);
         return ResponseEntity.ok(ApiRespuesta.exitoso(reactivado, "Usuario reactivado correctamente"));
+    }
+
+    @PostMapping("/solicitar-creacion-dueno")
+    public ResponseEntity<ApiRespuesta<Void>> solicitarCreacionDueno(
+            @AuthenticationPrincipal Usuario solicitante,
+            @Valid @RequestBody SolicitarCreacionDuenoDTO dto) {
+        usuarioServicio.solicitarCreacionDueno(solicitante.getId(), dto);
+        return ResponseEntity.ok(ApiRespuesta.exitoso(null,
+                "Te enviamos un código de confirmación a tu correo registrado"));
+    }
+
+    @PostMapping("/confirmar-creacion-dueno")
+    public ResponseEntity<ApiRespuesta<UsuarioRespuestaDTO>> confirmarCreacionDueno(
+            @AuthenticationPrincipal Usuario solicitante,
+            @Valid @RequestBody ConfirmarCreacionDuenoDTO dto) {
+        UsuarioRespuestaDTO creado = usuarioServicio.confirmarCreacionDueno(solicitante.getId(), dto);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiRespuesta.exitoso(creado, "Usuario DUEÑO creado correctamente"));
     }
 }
