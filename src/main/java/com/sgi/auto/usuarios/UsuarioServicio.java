@@ -1,6 +1,7 @@
 package com.sgi.auto.usuarios;
 
 import com.sgi.auto.compartido.ConflictoExcepcion;
+import com.sgi.auto.compartido.EmailServicio;
 import com.sgi.auto.compartido.RecursoNoEncontradoExcepcion;
 import com.sgi.auto.compartido.ReglaNegocioExcepcion;
 import com.sgi.auto.usuarios.dto.*;
@@ -9,14 +10,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.OffsetDateTime;
+import java.time.Duration;
 
+import java.security.SecureRandom;
 import java.util.List;
 
-/**
- * Servicio de gestión de usuarios del sistema.
- * RF-003 — Creación y gestión de usuarios por el DUEÑO.
- * RF-004 — Configuración de permisos granulares de la CAJERA.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -25,13 +24,14 @@ public class UsuarioServicio {
     private final UsuarioRepositorio usuarioRepositorio;
     private final UsuarioMapper usuarioMapper;
     private final PasswordEncoder codificadorContrasena;
+    private final SolicitudCreacionDuenoRepositorio solicitudCreacionDuenoRepositorio;
+    private final EmailServicio emailServicio;
 
-    /**
-     * Crea un nuevo usuario del sistema.
-     * RF-003
-     */
     @Transactional
     public UsuarioRespuestaDTO crear(UsuarioCrearDTO solicitud) {
+        if (solicitud.rol() == RolUsuario.DUENO) {
+            throw new ReglaNegocioExcepcion("Crear un usuario con rol DUENO requiere verificación por correo.");
+        }
 
         if (usuarioRepositorio.existePorNombreUsuario(solicitud.nombreUsuario())) {
             throw new ConflictoExcepcion(
@@ -41,7 +41,7 @@ public class UsuarioServicio {
         Usuario usuario = usuarioMapper.aEntidad(solicitud);
         usuario.setContrasenaHash(codificadorContrasena.encode(solicitud.contrasena()));
 
-        // RF-004: los permisos granulares solo aplican a CAJERA
+        // los permisos granulares solo aplican a CAJERA
         if (usuario.getRol() != RolUsuario.CAJERA) {
             usuario.setPuedeAplicarDescuento(false);
             usuario.setPuedeAnularVenta(false);
@@ -68,9 +68,7 @@ public class UsuarioServicio {
         log.info("Contraseña actualizada: nombreUsuario={}", usuario.getNombreUsuario());
     }
 
-    /**
-     * Lista todos los usuarios activos (no eliminados).
-     */
+    // Lista todos los usuarios activos (no eliminados).
     @Transactional(readOnly = true)
     public List<UsuarioRespuestaDTO> listarTodos() {
         return usuarioRepositorio.findAll().stream()
@@ -79,19 +77,14 @@ public class UsuarioServicio {
                 .toList();
     }
 
-    /**
-     * Obtiene un usuario por su id.
-     */
+    // Obtiene un usuario por su id.
     @Transactional(readOnly = true)
     public UsuarioRespuestaDTO obtenerPorId(Long id) {
         Usuario usuario = buscarOLanzar(id);
         return usuarioMapper.aDTO(usuario);
     }
 
-    /**
-     * Actualiza los permisos granulares de un usuario CAJERA.
-     * RF-004
-     */
+    // Actualiza los permisos granulares de un usuario CAJERA.
     @Transactional
     public UsuarioRespuestaDTO actualizarPermisos(Long id, PermisosActualizarDTO permisos) {
         Usuario usuario = buscarOLanzar(id);
@@ -113,9 +106,7 @@ public class UsuarioServicio {
         return usuarioMapper.aDTO(actualizado);
     }
 
-    /**
-     * Desactiva un usuario (soft delete lógico vía estaActivo, no elimina el registro).
-     */
+    // Desactiva un usuario (soft delete lógico vía estaActivo, no elimina el registro).
     @Transactional
     public void desactivar(Long id) {
         Usuario usuario = buscarOLanzar(id);
@@ -124,15 +115,105 @@ public class UsuarioServicio {
         log.info("Usuario desactivado: nombreUsuario={}", usuario.getNombreUsuario());
     }
 
-    /**
-     * Reactiva un usuario previamente desactivado.
-     */
+    // Reactiva un usuario previamente desactivado.
     @Transactional
     public UsuarioRespuestaDTO reactivar(Long id) {
         Usuario usuario = buscarOLanzar(id);
         usuario.setEstaActivo(true);
         Usuario actualizado = usuarioRepositorio.save(usuario);
         return usuarioMapper.aDTO(actualizado);
+    }
+
+    private static final SecureRandom RANDOM = new SecureRandom();
+
+    @Transactional
+    public void solicitarCreacionDueno(Long solicitanteId, SolicitarCreacionDuenoDTO dto) {
+        Usuario solicitante = buscarOLanzar(solicitanteId);
+
+        if (usuarioRepositorio.existePorNombreUsuario(dto.nombreUsuario())) {
+            throw new ConflictoExcepcion(
+                    "Ya existe un usuario con el nombre de usuario: " + dto.nombreUsuario());
+        }
+        if (usuarioRepositorio.buscarPorCorreo(dto.correo()).isPresent()) {
+            throw new ConflictoExcepcion("Ya existe un usuario con ese correo");
+        }
+
+        solicitudCreacionDuenoRepositorio
+                .findFirstBySolicitanteIdOrderByCreadoEnDesc(solicitanteId)
+                .ifPresent(ultima -> {
+                    long segundos = Duration.between(
+                            ultima.getCreadoEn(), java.time.OffsetDateTime.now()).getSeconds();
+                    if (segundos < 60) {
+                        throw new ReglaNegocioExcepcion(
+                                "Ya se envió un código recientemente. Espera un momento antes de pedir otro.");
+                    }
+                });
+
+        String codigo = String.valueOf(100000 + RANDOM.nextInt(900000));
+
+        SolicitudCreacionDueno solicitud = SolicitudCreacionDueno.builder()
+                .solicitanteId(solicitanteId)
+                .nombreCompleto(dto.nombreCompleto())
+                .nombreUsuario(dto.nombreUsuario())
+                .correo(dto.correo())
+                .contrasenaHash(codificadorContrasena.encode(dto.contrasena()))
+                .codigo(codigo)
+                .expiraEn(OffsetDateTime.now().plusMinutes(15))
+                .build();
+        solicitudCreacionDuenoRepositorio.save(solicitud);
+
+        String cuerpo = """
+                <p>Hola %s,</p>
+                <p>Solicitaste crear un nuevo usuario con rol <b>DUEÑO</b>:</p>
+                <ul>
+                  <li>Nombre: %s</li>
+                  <li>Usuario: %s</li>
+                  <li>Correo: %s</li>
+                </ul>
+                <p>Si fuiste tú, confirma con este código:</p>
+                <h2>%s</h2>
+                <p>Este código es válido por 15 minutos. Si no solicitaste esto, ignora este correo
+                y considera cambiar tu contraseña de inmediato.</p>
+                """.formatted(solicitante.getNombreCompleto(), dto.nombreCompleto(),
+                dto.nombreUsuario(), dto.correo(), codigo);
+
+        emailServicio.enviar(solicitante.getCorreo(),
+                "Confirma la creación de un nuevo usuario DUEÑO", cuerpo);
+
+        log.info("Solicitud de creación de DUEÑO generada por usuario id={}", solicitanteId);
+    }
+
+    @Transactional
+    public UsuarioRespuestaDTO confirmarCreacionDueno(Long solicitanteId, ConfirmarCreacionDuenoDTO dto) {
+        SolicitudCreacionDueno solicitud = solicitudCreacionDuenoRepositorio
+                .buscarValida(solicitanteId, dto.codigo(), java.time.OffsetDateTime.now())
+                .orElseThrow(() -> new ReglaNegocioExcepcion("Código inválido o expirado"));
+
+        // Doble chequeo por si cambió algo mientras el código estaba pendiente
+        if (usuarioRepositorio.existePorNombreUsuario(solicitud.getNombreUsuario())) {
+            throw new ConflictoExcepcion("Ya existe un usuario con ese nombre de usuario");
+        }
+        if (usuarioRepositorio.buscarPorCorreo(solicitud.getCorreo()).isPresent()) {
+            throw new ConflictoExcepcion("Ya existe un usuario con ese correo");
+        }
+
+        Usuario nuevo = Usuario.builder()
+                .nombreCompleto(solicitud.getNombreCompleto())
+                .nombreUsuario(solicitud.getNombreUsuario())
+                .correo(solicitud.getCorreo())
+                .contrasenaHash(solicitud.getContrasenaHash())
+                .rol(RolUsuario.DUENO)
+                .build();
+
+        Usuario guardado = usuarioRepositorio.save(nuevo);
+
+        solicitud.setUsada(true);
+        solicitudCreacionDuenoRepositorio.save(solicitud);
+
+        log.info("Usuario DUEÑO creado tras verificación: nombreUsuario={}, solicitadoPor={}",
+                guardado.getNombreUsuario(), solicitanteId);
+
+        return usuarioMapper.aDTO(guardado);
     }
 
     // ── Helper privado ──────────────────────────────────────────
