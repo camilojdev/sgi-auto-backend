@@ -13,6 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 
 @RestController
 @RequestMapping("/api/ventas")
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 public class VentaControlador {
 
     private final VentaServicio ventaServicio;
+    private final FacturaPdfServicio facturaPdfServicio;
 
     @PostMapping
     public ResponseEntity<ApiRespuesta<VentaRespuestaDTO>> crear(
@@ -62,5 +65,14 @@ public class VentaControlador {
             @PageableDefault(size = 50) Pageable pageable) {
         return ResponseEntity.ok(ApiRespuesta.exitoso(
                 ventaServicio.ventasDeHoy(pageable)));
+    }
+
+    @GetMapping(value = "/{id}/factura", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> descargarFactura(@PathVariable Long id) {
+        byte[] pdf = facturaPdfServicio.generar(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=factura-" + id + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 }

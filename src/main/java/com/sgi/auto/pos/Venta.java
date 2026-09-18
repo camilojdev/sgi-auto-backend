@@ -13,9 +13,6 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Entidad central del POS.
- */
 @Entity
 @Table(name = "ventas")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
