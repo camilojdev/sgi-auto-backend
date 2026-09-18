@@ -95,8 +95,7 @@ public class ConfiguracionSeguridad {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOriginPatterns(List.of(
                 "http://localhost:*",
-                "https://*.vercel.app",
-                "https://sgi-auto-frontend.vercel.app"
+                "https://almacen-y-servicios-db.vercel.app"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));

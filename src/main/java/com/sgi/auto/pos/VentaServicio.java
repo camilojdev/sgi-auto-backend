@@ -32,9 +32,6 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Servicio del Punto de Venta.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
