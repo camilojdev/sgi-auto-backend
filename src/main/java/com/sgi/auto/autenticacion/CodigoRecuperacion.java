@@ -45,4 +45,8 @@ public class CodigoRecuperacion {
     @Column(name = "creado_en", nullable = false)
     @Builder.Default
     private OffsetDateTime creadoEn = OffsetDateTime.now();
+
+    @Column(name = "intentos_fallidos", nullable = false)
+    @Builder.Default
+    private int intentosFallidos = 0;
 }

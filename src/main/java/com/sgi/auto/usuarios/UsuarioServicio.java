@@ -26,6 +26,8 @@ public class UsuarioServicio {
     private final PasswordEncoder codificadorContrasena;
     private final SolicitudCreacionDuenoRepositorio solicitudCreacionDuenoRepositorio;
     private final EmailServicio emailServicio;
+    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final int MAX_INTENTOS_CODIGO_DUENO = 5;
 
     @Transactional
     public UsuarioRespuestaDTO crear(UsuarioCrearDTO solicitud) {
@@ -124,8 +126,6 @@ public class UsuarioServicio {
         return usuarioMapper.aDTO(actualizado);
     }
 
-    private static final SecureRandom RANDOM = new SecureRandom();
-
     @Transactional
     public void solicitarCreacionDueno(Long solicitanteId, SolicitarCreacionDuenoDTO dto) {
         Usuario solicitante = buscarOLanzar(solicitanteId);
@@ -186,8 +186,23 @@ public class UsuarioServicio {
     @Transactional
     public UsuarioRespuestaDTO confirmarCreacionDueno(Long solicitanteId, ConfirmarCreacionDuenoDTO dto) {
         SolicitudCreacionDueno solicitud = solicitudCreacionDuenoRepositorio
-                .buscarValida(solicitanteId, dto.codigo(), java.time.OffsetDateTime.now())
+                .findFirstBySolicitanteIdAndUsadaFalseAndExpiraEnAfterOrderByCreadoEnDesc(
+                        solicitanteId, java.time.OffsetDateTime.now())
                 .orElseThrow(() -> new ReglaNegocioExcepcion("Código inválido o expirado"));
+
+        if (!solicitud.getCodigo().equals(dto.codigo())) {
+            solicitud.setIntentosFallidos(solicitud.getIntentosFallidos() + 1);
+
+            if (solicitud.getIntentosFallidos() >= MAX_INTENTOS_CODIGO_DUENO) {
+                solicitud.setUsada(true);
+                solicitudCreacionDuenoRepositorio.save(solicitud);
+                throw new ReglaNegocioExcepcion("Demasiados intentos fallidos. Solicita un nuevo código.");
+            }
+
+            solicitudCreacionDuenoRepositorio.save(solicitud);
+            int restantes = MAX_INTENTOS_CODIGO_DUENO - solicitud.getIntentosFallidos();
+            throw new ReglaNegocioExcepcion("Código incorrecto. Te quedan " + restantes + " intento(s).");
+        }
 
         // Doble chequeo por si cambió algo mientras el código estaba pendiente
         if (usuarioRepositorio.existePorNombreUsuario(solicitud.getNombreUsuario())) {
