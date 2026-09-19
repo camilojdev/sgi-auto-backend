@@ -22,6 +22,7 @@ public class CodigoVerificacionServicio {
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final int MINUTOS_VALIDEZ_CODIGO = 15;
     private static final int SEGUNDOS_ENTRE_SOLICITUDES = 60;
+    private static final int MAX_INTENTOS = 5;
 
     /*
      * Genera un código de 6 dígitos, lo guarda y lo envía por correo.
@@ -62,12 +63,30 @@ public class CodigoVerificacionServicio {
     }
 
     public CodigoRecuperacion validarYConsumir(Long usuarioId, String codigo, TipoCodigoRecuperacion tipo) {
-        CodigoRecuperacion valido = codigoRepositorio
-                .buscarValidoPorTipo(usuarioId, codigo, tipo, OffsetDateTime.now())
+        CodigoRecuperacion pendiente = codigoRepositorio
+                .findFirstByUsuarioIdAndTipoAndUsadoFalseAndExpiraEnAfterOrderByCreadoEnDesc(
+                        usuarioId, tipo, OffsetDateTime.now())
                 .orElseThrow(() -> new ReglaNegocioExcepcion("Código inválido o expirado"));
-        valido.setUsado(true);
-        codigoRepositorio.save(valido);
-        return valido;
+
+        if (!pendiente.getCodigo().equals(codigo)) {
+            pendiente.setIntentosFallidos(pendiente.getIntentosFallidos() + 1);
+
+            if (pendiente.getIntentosFallidos() >= MAX_INTENTOS) {
+                pendiente.setUsado(true);
+                codigoRepositorio.save(pendiente);
+                throw new ReglaNegocioExcepcion(
+                        "Demasiados intentos fallidos. Solicita un nuevo código.");
+            }
+
+            codigoRepositorio.save(pendiente);
+            int restantes = MAX_INTENTOS - pendiente.getIntentosFallidos();
+            throw new ReglaNegocioExcepcion(
+                    "Código incorrecto. Te quedan " + restantes + " intento(s).");
+        }
+
+        pendiente.setUsado(true);
+        codigoRepositorio.save(pendiente);
+        return pendiente;
     }
 
     private String generarCodigo() {

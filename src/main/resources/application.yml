@@ -31,30 +31,24 @@ spring:
       max-file-size: 5MB
       max-request-size: 5MB
 
-  mail:
-    host: ${MAIL_HOST:smtp-relay.brevo.com}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
-          connectiontimeout: 5000
-          timeout: 5000
-
 server:
   port: ${PORT:8080}
 
-# ─────────────────────────────────────────
-# JWT
-# ─────────────────────────────────────────
 sgi:
+  # ─────────────────────────────────────────
+  # JWT
+  # ─────────────────────────────────────────
   jwt:
     secreto: ${JWT_SECRET:desarrollo_local_cambiar_en_produccion_256bits_minimo}
     expiracion-horas: ${JWT_EXPIRACION_HORAS:8}
+
+  # ─────────────────────────────────────────
+  # Api Email
+  # ─────────────────────────────────────────
+  brevo:
+    api-key: ${BREVO_API_KEY:local}
+    remitente-correo: ${BREVO_REMITENTE_CORREO:almacenyservicioselectricosdb@gmail.com}
+    remitente-nombre: ${BREVO_REMITENTE_NOMBRE:Almacén y Servicios Eléctricos DB}
 
   # ─────────────────────────────────────────
   # Cloudinary

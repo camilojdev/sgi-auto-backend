@@ -23,4 +23,7 @@ public interface SolicitudCreacionDuenoRepositorio extends JpaRepository<Solicit
             @Param("solicitanteId") Long solicitanteId,
             @Param("codigo") String codigo,
             @Param("ahora") OffsetDateTime ahora);
+
+    Optional<SolicitudCreacionDueno> findFirstBySolicitanteIdAndUsadaFalseAndExpiraEnAfterOrderByCreadoEnDesc(
+            Long solicitanteId, OffsetDateTime ahora);
 }
