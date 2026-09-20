@@ -6,6 +6,7 @@ import java.time.OffsetDateTime;
 public record ProductoRespuestaDTO(
         Long id,
         String codigo,
+        String numeroInterno,
         String nombre,
         String descripcion,
         Long categoriaId,

@@ -51,7 +51,10 @@ class ProductoServicioPrueba {
         productoPrueba.setPrecioVentaMayor(new BigDecimal("80000"));
 
         solicitudCrear = new ProductoCrearDTO(
-                "PROD-001", "Alternador 12V", "Alternador para vehículos livianos",
+                "PROD-001",
+                null, // numeroInterno
+                "Alternador 12V",
+                "Alternador para vehículos livianos",
                 null, null, "unidad",
                 new BigDecimal("50000"),
                 new BigDecimal("80000"),
@@ -60,7 +63,11 @@ class ProductoServicioPrueba {
                 true);
 
         respuestaPrueba = new ProductoRespuestaDTO(
-                1L, "PROD-001", "Alternador 12V", "Alternador para vehículos livianos",
+                1L,
+                "PROD-001",
+                null,              // numeroInterno
+                "Alternador 12V",
+                "Alternador para vehículos livianos",
                 null,              // categoriaId
                 null,              // categoriaNombre
                 null,              // proveedorNombre
