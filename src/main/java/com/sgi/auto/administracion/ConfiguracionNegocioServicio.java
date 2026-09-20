@@ -50,9 +50,24 @@ public class ConfiguracionNegocioServicio {
         return aDTO(repositorio.save(config));
     }
 
+    @Transactional
+    public ConfiguracionNegocioRespuestaDTO actualizarLogoEtiquetas(MultipartFile archivo, Long usuarioId) {
+        ConfiguracionNegocio config = repositorio.obtenerConfiguracion();
+        if (config.getLogoEtiquetasPublicId() != null) {
+            imagenServicio.eliminar(config.getLogoEtiquetasPublicId());
+        }
+        var resultado = imagenServicio.subirPngTransparente(archivo, "sgi-auto/etiquetas");
+        config.setLogoEtiquetasUrl(resultado.url());
+        config.setLogoEtiquetasPublicId(resultado.publicId());
+        config.setActualizadoEn(OffsetDateTime.now());
+        config.setActualizadoPor(usuarioId);
+        return aDTO(repositorio.save(config));
+    }
+
     private ConfiguracionNegocioRespuestaDTO aDTO(ConfiguracionNegocio c) {
         return new ConfiguracionNegocioRespuestaDTO(
                 c.getNombreNegocio(), c.getEslogan(), c.getLogoUrl(),
+                c.getLogoEtiquetasUrl(),
                 c.getDireccion(), c.getTelefono(), c.getNit(), c.getPiePaginaFactura());
     }
 }

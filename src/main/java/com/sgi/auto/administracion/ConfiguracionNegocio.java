@@ -47,4 +47,10 @@ public class ConfiguracionNegocio {
 
     @Column(name = "actualizado_por")
     private Long actualizadoPor;
+
+    @Column(name = "logo_etiquetas_url", columnDefinition = "TEXT")
+    private String logoEtiquetasUrl;
+
+    @Column(name = "logo_etiquetas_public_id", length = 200)
+    private String logoEtiquetasPublicId;
 }
