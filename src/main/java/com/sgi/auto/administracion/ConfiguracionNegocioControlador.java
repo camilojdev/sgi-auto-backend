@@ -42,4 +42,13 @@ public class ConfiguracionNegocioControlador {
         return ResponseEntity.ok(ApiRespuesta.exitoso(
                 servicio.actualizarLogo(archivo, usuario.getId()), "Logo actualizado"));
     }
+
+    @PostMapping(value = "/logo-etiquetas", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('DUENO')")
+    public ResponseEntity<ApiRespuesta<ConfiguracionNegocioRespuestaDTO>> actualizarLogoEtiquetas(
+            @RequestParam("archivo") MultipartFile archivo,
+            @AuthenticationPrincipal Usuario usuario) {
+        return ResponseEntity.ok(ApiRespuesta.exitoso(
+                servicio.actualizarLogoEtiquetas(archivo, usuario.getId()), "Logo de etiquetas actualizado"));
+    }
 }
