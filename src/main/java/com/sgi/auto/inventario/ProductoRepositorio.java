@@ -11,7 +11,6 @@ import java.util.Optional;
 
 public interface ProductoRepositorio extends JpaRepository<Producto, Long> {
 
-    // Búsqueda full-text con índice GIN
     @Query(value = """
         SELECT * FROM productos
         WHERE eliminado_en IS NULL
@@ -23,23 +22,30 @@ public interface ProductoRepositorio extends JpaRepository<Producto, Long> {
         """, nativeQuery = true)
     List<Producto> buscarPorNombre(@Param("termino") String termino);
 
-    // Búsqueda por código exacto
     @Query("SELECT p FROM Producto p WHERE p.codigo = :codigo AND p.estaActivo = true AND p.eliminadoEn IS NULL")
     Optional<Producto> buscarPorCodigo(@Param("codigo") String codigo);
 
-    // Verificar código duplicado
     @Query("SELECT COUNT(p) > 0 FROM Producto p WHERE p.codigo = :codigo AND p.eliminadoEn IS NULL")
     boolean existePorCodigo(@Param("codigo") String codigo);
 
-    // Listar activos con paginación
+    @Query("SELECT COUNT(p) > 0 FROM Producto p WHERE p.codigo = :codigo AND p.id <> :id AND p.eliminadoEn IS NULL")
+    boolean existePorCodigoExcluyendoId(@Param("codigo") String codigo, @Param("id") Long id);
+
+    @Query("SELECT p FROM Producto p WHERE p.numeroInterno = :numeroInterno AND p.estaActivo = true AND p.eliminadoEn IS NULL")
+    Optional<Producto> buscarPorNumeroInterno(@Param("numeroInterno") String numeroInterno);
+
+    @Query("SELECT COUNT(p) > 0 FROM Producto p WHERE p.numeroInterno = :numeroInterno AND p.eliminadoEn IS NULL")
+    boolean existePorNumeroInterno(@Param("numeroInterno") String numeroInterno);
+
+    @Query("SELECT COUNT(p) > 0 FROM Producto p WHERE p.numeroInterno = :numeroInterno AND p.id <> :id AND p.eliminadoEn IS NULL")
+    boolean existePorNumeroInternoExcluyendoId(@Param("numeroInterno") String numeroInterno, @Param("id") Long id);
+
     @Query("SELECT p FROM Producto p WHERE p.estaActivo = true AND p.eliminadoEn IS NULL ORDER BY p.nombre")
     Page<Producto> listarActivos(Pageable pageable);
 
-    // Productos con stock por debajo del mínimo
     @Query("SELECT p FROM Producto p WHERE p.estaActivo = true AND p.eliminadoEn IS NULL AND p.stockActual <= p.stockMinimo")
     List<Producto> listarConStockBajoMinimo();
 
-    // Para lista de precios
     @Query("SELECT p FROM Producto p WHERE p.estaActivo = true AND p.eliminadoEn IS NULL AND p.mostrarEnListaPrecios = true ORDER BY p.nombre")
     List<Producto> listarParaListaPrecios();
 }
