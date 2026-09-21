@@ -4,8 +4,6 @@ import com.sgi.auto.compartido.EntidadBase;
 import com.sgi.auto.usuarios.Usuario;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 
@@ -16,6 +14,9 @@ public class Producto extends EntidadBase {
 
     @Column(name = "codigo", nullable = false, length = 50)
     private String codigo;
+
+    @Column(name = "numero_interno", length = 20)
+    private String numeroInterno;
 
     @Column(name = "nombre", nullable = false, length = 200)
     private String nombre;
@@ -35,7 +36,6 @@ public class Producto extends EntidadBase {
     @Builder.Default
     private String unidadMedida = "unidad";
 
-    // Precios
     @Column(name = "precio_compra_con_iva", nullable = false, precision = 14, scale = 2)
     @Builder.Default
     private BigDecimal precioCompraConIva = BigDecimal.ZERO;
@@ -52,11 +52,9 @@ public class Producto extends EntidadBase {
     @Builder.Default
     private BigDecimal precioVentaMayor = BigDecimal.ZERO;
 
-    // margen_ganancia_pct es columna GENERATED en BD — solo lectura
     @Column(name = "margen_ganancia_pct", insertable = false, updatable = false)
     private BigDecimal margenGananciaPct;
 
-    // Inventario
     @Column(name = "stock_actual", nullable = false)
     @Builder.Default
     private int stockActual = 0;
@@ -65,7 +63,6 @@ public class Producto extends EntidadBase {
     @Builder.Default
     private int stockMinimo = 0;
 
-    // Visibilidad
     @Column(name = "mostrar_en_lista_precios", nullable = false)
     @Builder.Default
     private boolean mostrarEnListaPrecios = true;
@@ -77,4 +74,7 @@ public class Producto extends EntidadBase {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "registrado_por")
     private Usuario registradoPor;
+
+    @Column(name = "precio_oculto", length = 20)
+    private String precioOculto;
 }

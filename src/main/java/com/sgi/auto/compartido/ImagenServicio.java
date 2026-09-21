@@ -6,7 +6,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-
+import java.io.IOException;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -64,5 +66,34 @@ public class ImagenServicio {
         if (!TIPOS_PERMITIDOS.contains(archivo.getContentType())) {
             throw new ReglaNegocioExcepcion("Formato de imagen no permitido. Usa JPG, PNG o WEBP");
         }
+    }
+
+    /**
+     * Igual que subir(), pero además exige que el PNG tenga canal alfa
+     * (transparencia real). Se usa para recursos que se superponen sobre
+     * un diseño ya impreso — como el logo de etiquetas — donde un fondo
+     * blanco sólido se vería como un recuadro feo sobre la etiqueta.
+     */
+    public ResultadoSubidaImagen subirPngTransparente(MultipartFile archivo, String carpeta) {
+        validar(archivo);
+
+        if (!"image/png".equals(archivo.getContentType())) {
+            throw new ReglaNegocioExcepcion("El logo de etiquetas debe ser un archivo PNG");
+        }
+
+        try {
+            BufferedImage imagen = ImageIO.read(archivo.getInputStream());
+            if (imagen == null) {
+                throw new ReglaNegocioExcepcion("No se pudo leer el archivo como imagen");
+            }
+            if (!imagen.getColorModel().hasAlpha()) {
+                throw new ReglaNegocioExcepcion(
+                        "El logo de etiquetas debe ser un PNG con fondo transparente");
+            }
+        } catch (IOException e) {
+            throw new ReglaNegocioExcepcion("No se pudo procesar la imagen: " + e.getMessage());
+        }
+
+        return subir(archivo, carpeta);
     }
 }

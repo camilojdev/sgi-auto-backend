@@ -4,39 +4,30 @@ import com.sgi.auto.compartido.ConflictoExcepcion;
 import com.sgi.auto.compartido.RecursoNoEncontradoExcepcion;
 import com.sgi.auto.compartido.ReglaNegocioExcepcion;
 import com.sgi.auto.inventario.dto.*;
+import com.sgi.auto.usuarios.Usuario;
+import com.sgi.auto.usuarios.UsuarioRepositorio;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
 
-/**
- * Servicio de gestión de inventario.
- * — Registro de productos
- * — Búsqueda en tiempo real
- * — Alerta stock mínimo
- * — Entrada de mercancía
- * — Devoluciones
- * — Kardex
- * — Ajuste manual
- * — Precios detal y mayor
- * — Margen automático (columna GENERATED en BD)
- * — Proveedores
- * — Categorías
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProductoServicio {
 
     private final ProductoRepositorio productoRepositorio;
+    private final ProductoCodigoRepositorio productoCodigoRepositorio;
     private final MovimientoStockRepositorio movimientoStockRepositorio;
     private final CategoriaRepositorio categoriaRepositorio;
     private final ProveedorRepositorio proveedorRepositorio;
+    private final UsuarioRepositorio usuarioRepositorio;
     //private final EntradaMercanciaRepositorio entradaMercanciaRepositorio;
     private final ProductoMapper productoMapper;
 
@@ -49,11 +40,15 @@ public class ProductoServicio {
                     "Ya existe un producto con el código: " + solicitud.codigo());
         }
 
+        if (solicitud.numeroInterno() != null && !solicitud.numeroInterno().isBlank()
+                && productoRepositorio.existePorNumeroInterno(solicitud.numeroInterno())) {
+            throw new ConflictoExcepcion(
+                    "Ya existe un producto con el número interno: " + solicitud.numeroInterno());
+        }
+
         Producto producto = productoMapper.aEntidad(solicitud);
-        // Mapear precio de venta a ambos campos
         producto.setPrecioVentaDetal(solicitud.precioVentaCop());
         producto.setPrecioVentaMayor(solicitud.precioVentaCop());
-// Mapear precio de compra sin IVA igual al con IVA por defecto
         producto.setPrecioCompraSinIva(solicitud.precioCompraConIva());
         producto.setStockActual(solicitud.stockActual());
         if (solicitud.categoriaId() != null) {
@@ -71,6 +66,14 @@ public class ProductoServicio {
         }
 
         Producto guardado = productoRepositorio.save(producto);
+
+        productoCodigoRepositorio.save(ProductoCodigo.builder()
+                .producto(guardado)
+                .codigo(guardado.getCodigo())
+                .activo(true)
+                .cambiadoPor(obtenerUsuarioActual())
+                .build());
+
         log.info("Producto creado: codigo={}, nombre={}", guardado.getCodigo(), guardado.getNombre());
         return productoMapper.aDTO(guardado);
     }
@@ -104,7 +107,6 @@ public class ProductoServicio {
                         "No se encontró el producto con código: " + codigo));
     }
 
-    // Búsqueda full-text con índice GIN
     @Transactional(readOnly = true)
     public List<ProductoRespuestaDTO> buscar(String termino) {
         if (termino == null || termino.trim().length() < 2) {
@@ -116,7 +118,6 @@ public class ProductoServicio {
                 .toList();
     }
 
-    // Productos con stock bajo mínimo
     @Transactional(readOnly = true)
     public List<ProductoRespuestaDTO> listarConStockBajoMinimo() {
         return productoRepositorio.listarConStockBajoMinimo()
@@ -124,60 +125,6 @@ public class ProductoServicio {
                 .map(productoMapper::aDTO)
                 .toList();
     }
-
-    /* ── Entrada de Mercancía ─────────────────────────
-
-    @Transactional
-    public void registrarEntrada(EntradaMercanciaDTO solicitud) {
-        EntradaMercancia entrada = new EntradaMercancia();
-        entrada.setNumeroFacturaProveedor(solicitud.numeroFacturaProveedor());
-        entrada.setNotas(solicitud.notas());
-
-        if (solicitud.proveedorId() != null) {
-            Proveedor proveedor = proveedorRepositorio.findById(solicitud.proveedorId())
-                    .orElseThrow(() -> new RecursoNoEncontradoExcepcion(
-                            "No se encontró el proveedor con id: " + solicitud.proveedorId()));
-            entrada.setProveedor(proveedor);
-        }
-
-        BigDecimal costoTotal = BigDecimal.ZERO;
-
-        for (EntradaMercanciaDTO.ItemEntradaDTO itemDTO : solicitud.items()) {
-            Producto producto = buscarProductoOLanzar(itemDTO.productoId());
-
-            ItemEntrada item = new ItemEntrada();
-            item.setEntrada(entrada);
-            item.setProducto(producto);
-            item.setCantidad(itemDTO.cantidad());
-            item.setCostoUnitarioConIva(itemDTO.costoUnitarioConIva());
-            item.setCostoUnitarioSinIva(itemDTO.costoUnitarioSinIva());
-
-            BigDecimal subtotal = itemDTO.costoUnitarioConIva()
-                    .multiply(BigDecimal.valueOf(itemDTO.cantidad()));
-            item.setSubtotalCop(subtotal);
-            costoTotal = costoTotal.add(subtotal);
-
-            entrada.getItems().add(item);
-
-            // Actualizar stock + registrar movimiento en la misma transacción
-            int stockAntes = producto.getStockActual();
-            producto.setStockActual(stockAntes + itemDTO.cantidad());
-            producto.setPrecioCompraConIva(itemDTO.costoUnitarioConIva());
-            producto.setPrecioCompraSinIva(itemDTO.costoUnitarioSinIva());
-            productoRepositorio.save(producto);
-
-            registrarMovimiento(producto, TipoMovimientoStock.ENTRADA,
-                    itemDTO.cantidad(), stockAntes,
-                    producto.getStockActual(),
-                    itemDTO.costoUnitarioConIva(),
-                    "Entrada de mercancía");
-        }
-
-        entrada.setCostoTotalCop(costoTotal);
-        entradaMercanciaRepositorio.save(entrada);
-        log.info("Entrada de mercancía registrada: {} items, total={}",
-                solicitud.items().size(), costoTotal);
-    }*/
 
     // ── Ajuste Manual de Inventario ──────────────────
 
@@ -211,7 +158,7 @@ public class ProductoServicio {
 
     @Transactional(readOnly = true)
     public Page<KardexRespuestaDTO> obtenerKardex(Long productoId, Pageable pageable) {
-        buscarProductoOLanzar(productoId); // valida que el producto exista
+        buscarProductoOLanzar(productoId);
         return movimientoStockRepositorio
                 .kardexPorProducto(productoId, pageable)
                 .map(this::aKardexDTO);
@@ -250,12 +197,56 @@ public class ProductoServicio {
         }
         return proveedorRepositorio.save(proveedor);
     }
+
     @Transactional
     public ProductoRespuestaDTO actualizarProducto(Long id, ProductoCrearDTO solicitud) {
         Producto producto = buscarProductoOLanzar(id);
 
+        // ── Cambio de código: mantiene historial, nunca se sobrescribe sin dejar rastro ──
+        if (!producto.getCodigo().equals(solicitud.codigo())) {
+            if (productoRepositorio.existePorCodigoExcluyendoId(solicitud.codigo(), id)) {
+                throw new ConflictoExcepcion(
+                        "Ya existe un producto con el código: " + solicitud.codigo());
+            }
+            if (productoCodigoRepositorio.existsByCodigoAndProductoIdNot(solicitud.codigo(), id)) {
+                throw new ConflictoExcepcion(
+                        "Ese código ya fue utilizado anteriormente por otro producto");
+            }
+
+            productoCodigoRepositorio.findByProductoIdAndActivoTrue(id)
+                    .ifPresent(anterior -> {
+                        anterior.setActivo(false);
+                        productoCodigoRepositorio.save(anterior);
+                    });
+
+            productoCodigoRepositorio.save(ProductoCodigo.builder()
+                    .producto(producto)
+                    .codigo(solicitud.codigo())
+                    .activo(true)
+                    .cambiadoPor(obtenerUsuarioActual())
+                    .build());
+
+            producto.setCodigo(solicitud.codigo());
+            log.info("Código de producto cambiado: productoId={}, nuevoCodigo={}", id, solicitud.codigo());
+        }
+
+        // ── Número interno: se asigna una sola vez, nunca cambia ──
+        String numeroInternoNuevo = solicitud.numeroInterno();
+        if (producto.getNumeroInterno() != null) {
+            if (numeroInternoNuevo != null && !numeroInternoNuevo.isBlank()
+                    && !numeroInternoNuevo.equals(producto.getNumeroInterno())) {
+                throw new ReglaNegocioExcepcion(
+                        "El número interno no se puede modificar una vez asignado");
+            }
+        } else if (numeroInternoNuevo != null && !numeroInternoNuevo.isBlank()) {
+            if (productoRepositorio.existePorNumeroInternoExcluyendoId(numeroInternoNuevo, id)) {
+                throw new ConflictoExcepcion(
+                        "Ya existe un producto con el número interno: " + numeroInternoNuevo);
+            }
+            producto.setNumeroInterno(numeroInternoNuevo);
+        }
+
         producto.setNombre(solicitud.nombre());
-        producto.setCodigo(solicitud.codigo());
         producto.setDescripcion(solicitud.descripcion());
         producto.setUnidadMedida(solicitud.unidadMedida());
         producto.setPrecioCompraConIva(solicitud.precioCompraConIva());
@@ -264,6 +255,7 @@ public class ProductoServicio {
         producto.setPrecioVentaMayor(solicitud.precioVentaCop());
         producto.setStockMinimo(solicitud.stockMinimo());
         producto.setMostrarEnListaPrecios(solicitud.mostrarEnListaPrecios());
+        producto.setPrecioOculto(solicitud.precioOculto());
 
         if (solicitud.categoriaId() != null) {
             Categoria categoria = categoriaRepositorio.findById(solicitud.categoriaId())
@@ -277,6 +269,17 @@ public class ProductoServicio {
         return productoMapper.aDTO(productoRepositorio.save(producto));
     }
 
+    // ── Historial de códigos ──────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<ProductoCodigoRespuestaDTO> obtenerHistorialCodigos(Long productoId) {
+        buscarProductoOLanzar(productoId);
+        return productoCodigoRepositorio.findByProductoIdOrderByFechaCreacionDesc(productoId)
+                .stream()
+                .map(this::aHistorialDTO)
+                .toList();
+    }
+
     // ── Helpers privados ──────────────────────────────────────
 
     private Producto buscarProductoOLanzar(Long id) {
@@ -284,6 +287,11 @@ public class ProductoServicio {
                 .filter(p -> p.getEliminadoEn() == null)
                 .orElseThrow(() -> new RecursoNoEncontradoExcepcion(
                         "No se encontró el producto con id: " + id));
+    }
+
+    private Usuario obtenerUsuarioActual() {
+        String nombreUsuario = SecurityContextHolder.getContext().getAuthentication().getName();
+        return usuarioRepositorio.buscarPorNombreUsuario(nombreUsuario).orElse(null);
     }
 
     private void registrarMovimiento(
@@ -321,5 +329,14 @@ public class ProductoServicio {
                         ? m.getRegistradoPor().getNombreCompleto()
                         : "Sistema",
                 m.getCreadoEn());
+    }
+
+    private ProductoCodigoRespuestaDTO aHistorialDTO(ProductoCodigo c) {
+        return new ProductoCodigoRespuestaDTO(
+                c.getId(),
+                c.getCodigo(),
+                c.isActivo(),
+                c.getFechaCreacion(),
+                c.getCambiadoPor() != null ? c.getCambiadoPor().getNombreCompleto() : "Sistema");
     }
 }
