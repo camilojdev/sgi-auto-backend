@@ -255,6 +255,7 @@ public class ProductoServicio {
         producto.setPrecioVentaMayor(solicitud.precioVentaCop());
         producto.setStockMinimo(solicitud.stockMinimo());
         producto.setMostrarEnListaPrecios(solicitud.mostrarEnListaPrecios());
+        producto.setPrecioOculto(solicitud.precioOculto());
 
         if (solicitud.categoriaId() != null) {
             Categoria categoria = categoriaRepositorio.findById(solicitud.categoriaId())
