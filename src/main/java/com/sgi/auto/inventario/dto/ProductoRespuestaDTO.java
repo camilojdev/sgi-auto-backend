@@ -23,5 +23,6 @@ public record ProductoRespuestaDTO(
         boolean stockBajoMinimo,
         boolean mostrarEnListaPrecios,
         boolean estaActivo,
-        OffsetDateTime creadoEn
+        OffsetDateTime creadoEn,
+        String precioOculto
 ) {}

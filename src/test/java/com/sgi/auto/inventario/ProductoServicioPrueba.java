@@ -60,7 +60,8 @@ class ProductoServicioPrueba {
                 new BigDecimal("80000"),
                 10,  // stockActual
                 3,   // stockMinimo
-                true);
+                true,
+                null);
 
         respuestaPrueba = new ProductoRespuestaDTO(
                 1L,
@@ -82,6 +83,7 @@ class ProductoServicioPrueba {
                 false,             // stockBajoMinimo
                 true,              // mostrarEnListaPrecios
                 true,              // estaActivo
+                null,
                 null);             // creadoEn
     }
 

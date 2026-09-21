@@ -74,4 +74,7 @@ public class Producto extends EntidadBase {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "registrado_por")
     private Usuario registradoPor;
+
+    @Column(name = "precio_oculto", length = 20)
+    private String precioOculto;
 }

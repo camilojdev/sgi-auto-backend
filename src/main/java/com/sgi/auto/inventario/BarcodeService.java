@@ -1,5 +1,10 @@
 package com.sgi.auto.inventario;
 
+import com.itextpdf.barcodes.Barcode128;
+import com.itextpdf.kernel.colors.ColorConstants;
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.xobject.PdfFormXObject;
+import com.itextpdf.layout.element.Image;
 import com.sgi.auto.compartido.RecursoNoEncontradoExcepcion;
 import com.sgi.auto.compartido.ReglaNegocioExcepcion;
 import com.sgi.auto.inventario.dto.ProductoIdentificadoDTO;
@@ -11,13 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Punto único de acceso para todo lo relacionado a códigos de producto:
- * validación de formato y resolución de búsquedas (código vigente,
- * historial, número interno, nombre). La generación de la imagen del
- * código de barras para PDFs se agrega en la fase de integración con
- * Factura/OT, cuando ya exista un PdfDocument real contra el cual probarla.
- */
 @Service
 @RequiredArgsConstructor
 public class BarcodeService {
@@ -40,13 +38,20 @@ public class BarcodeService {
     }
 
     /**
-     * Búsqueda en cascada, pensada para lectores de código de barras y
-     * búsquedas exactas:
-     * 1. Código vigente del producto.
-     * 2. Historial de códigos (código anterior, ya desactivado).
-     * 3. Número interno.
-     * 4. Nombre, solo si hay una coincidencia única.
+     * Genera la imagen del código de barras Code128 lista para insertar en un PDF.
+     * El texto legible se dibuja aparte por quien llama, para tener control total
+     * de tamaño y tipografía — por eso se desactiva el texto propio del código de barras.
      */
+    public Image generarImagenCodigoBarras(PdfDocument pdfDocument, String codigo) {
+        validarCodigo(codigo);
+        Barcode128 barcode128 = new Barcode128(pdfDocument);
+        barcode128.setCodeType(Barcode128.CODE128);
+        barcode128.setCode(codigo);
+        barcode128.setFont(null);
+        PdfFormXObject xObject = barcode128.createFormXObject(ColorConstants.BLACK, ColorConstants.BLACK, pdfDocument);
+        return new Image(xObject);
+    }
+
     @Transactional(readOnly = true)
     public ProductoIdentificadoDTO identificarProducto(String termino) {
         if (termino == null || termino.isBlank()) {

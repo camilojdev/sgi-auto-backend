@@ -43,5 +43,8 @@ public record ProductoCrearDTO(
         @Min(value = 0)
         int stockMinimo,
 
-        boolean mostrarEnListaPrecios
+        boolean mostrarEnListaPrecios,
+
+        @Size(max = 20, message = "El precio oculto no puede superar los 20 caracteres")
+        String precioOculto
 ) {}
