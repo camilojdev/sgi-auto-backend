@@ -9,6 +9,8 @@ import java.util.List;
 
 public record OTRespuestaDTO(
         Long id,
+        String numeroOt,
+        String codigoSeguro,
         String nombreCliente,
         String celularCliente,
         String placa,
