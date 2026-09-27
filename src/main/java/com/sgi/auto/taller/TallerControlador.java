@@ -7,13 +7,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-
 
 @RestController
 @RequestMapping("/api/taller/ordenes")
@@ -22,6 +23,7 @@ import java.util.List;
 public class TallerControlador {
 
     private final TallerServicio tallerServicio;
+    private final PlanillaOtPdfServicio planillaOtPdfServicio;
 
     @PostMapping
     @PreAuthorize("hasAnyRole('DUENO','MECANICO')")
@@ -38,6 +40,14 @@ public class TallerControlador {
             @PathVariable Long id) {
         return ResponseEntity.ok(
                 ApiRespuesta.exitoso(tallerServicio.obtenerPorId(id)));
+    }
+
+    // Búsqueda por el código escaneado del código de barras de la planilla.
+    @GetMapping("/codigo/{codigoSeguro}")
+    public ResponseEntity<ApiRespuesta<OTRespuestaDTO>> obtenerPorCodigoSeguro(
+            @PathVariable String codigoSeguro) {
+        return ResponseEntity.ok(
+                ApiRespuesta.exitoso(tallerServicio.obtenerPorCodigoSeguro(codigoSeguro)));
     }
 
     @GetMapping
@@ -112,5 +122,14 @@ public class TallerControlador {
         return ResponseEntity.ok(ApiRespuesta.exitoso(
                 tallerServicio.cambiarEstado(id, solicitud),
                 "Estado actualizado correctamente"));
+    }
+
+    @GetMapping(value = "/{id}/planilla", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> descargarPlanilla(@PathVariable Long id) {
+        byte[] pdf = planillaOtPdfServicio.generar(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=OT-" + id + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 }

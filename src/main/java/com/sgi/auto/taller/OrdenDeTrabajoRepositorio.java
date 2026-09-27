@@ -7,10 +7,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface OrdenDeTrabajoRepositorio extends JpaRepository<OrdenDeTrabajo, Long> {
 
-    // Historial por placa (RF-055)
+    // Historial por placa
     @Query("SELECT o FROM OrdenDeTrabajo o WHERE o.placa = :placa ORDER BY o.creadoEn DESC")
     List<OrdenDeTrabajo> buscarPorPlaca(@Param("placa") String placa);
 
@@ -23,11 +24,16 @@ public interface OrdenDeTrabajoRepositorio extends JpaRepository<OrdenDeTrabajo,
             """)
     List<OrdenDeTrabajo> otActivasPorMecanico(@Param("mecanicoId") Long mecanicoId);
 
-    // Todas las OTs activas (RF-069)
+    // Todas las OTs activas
     @Query("SELECT o FROM OrdenDeTrabajo o WHERE o.estado NOT IN ('ENTREGADO','CANCELADO') ORDER BY o.creadoEn DESC")
     Page<OrdenDeTrabajo> listarActivas(Pageable pageable);
 
     // Todas las OTs
     @Query("SELECT o FROM OrdenDeTrabajo o ORDER BY o.creadoEn DESC")
     Page<OrdenDeTrabajo> listarTodas(Pageable pageable);
+
+    // Búsqueda por el código seguro impreso en el código de barras
+    Optional<OrdenDeTrabajo> findByCodigoSeguro(String codigoSeguro);
+
+    boolean existsByCodigoSeguro(String codigoSeguro);
 }

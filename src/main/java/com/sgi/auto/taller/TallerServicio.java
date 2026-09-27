@@ -1,6 +1,7 @@
 package com.sgi.auto.taller;
 
 import com.sgi.auto.clientes.ClienteRepositorio;
+import com.sgi.auto.compartido.GeneradorCodigoSeguro;
 import com.sgi.auto.compartido.RecursoNoEncontradoExcepcion;
 import com.sgi.auto.compartido.ReglaNegocioExcepcion;
 import com.sgi.auto.inventario.MovimientoStock;
@@ -34,13 +35,13 @@ public class TallerServicio {
     private final UsuarioRepositorio usuarioRepositorio;
     private final RepuestoOTRepositorio repuestoOTRepositorio;
     private final ServicioOTRepositorio servicioOTRepositorio;
-    // ── Órdenes de Trabajo ────────────────────────────────────
 
-    // Crea una nueva Orden de Trabajo.
+    private static final int LONGITUD_CODIGO_SEGURO = 8;
 
     @Transactional
     public OTRespuestaDTO crear(OTCrearDTO solicitud) {
         OrdenDeTrabajo ot = new OrdenDeTrabajo();
+        ot.setCodigoSeguro(generarCodigoSeguroUnico());
 
         // Datos del cliente (denormalizados)
         ot.setNombreCliente(solicitud.nombreCliente());
@@ -83,13 +84,25 @@ public class TallerServicio {
         }
 
         OrdenDeTrabajo guardada = otRepositorio.save(ot);
-        log.info("OT creada: id={}, placa={}", guardada.getId(), guardada.getPlaca());
-        return aDTO(guardada);
+        log.info("OT creada: id={}, numeroOt={}, placa={}",
+                guardada.getId(), guardada.getNumeroOt(), guardada.getPlaca());
+        // Recargamos para traer numero_ot, que lo genera el trigger de la BD
+        // y no viaja en el INSERT que acabamos de hacer.
+        return aDTO(buscarOLanzar(guardada.getId()));
     }
 
     @Transactional(readOnly = true)
     public OTRespuestaDTO obtenerPorId(Long id) {
         return aDTO(buscarOLanzar(id));
+    }
+
+    // Búsqueda por el código escaneado del código de barras de la planilla.
+    @Transactional(readOnly = true)
+    public OTRespuestaDTO obtenerPorCodigoSeguro(String codigoSeguro) {
+        OrdenDeTrabajo ot = otRepositorio.findByCodigoSeguro(codigoSeguro)
+                .orElseThrow(() -> new RecursoNoEncontradoExcepcion(
+                        "No se encontró ninguna OT con ese código"));
+        return aDTO(ot);
     }
 
     @Transactional(readOnly = true)
@@ -282,6 +295,19 @@ public class TallerServicio {
         }
     }
 
+    private String generarCodigoSeguroUnico() {
+        String codigo;
+        int intentos = 0;
+        do {
+            codigo = "OT-" + GeneradorCodigoSeguro.generar(LONGITUD_CODIGO_SEGURO);
+            if (++intentos > 5) {
+                throw new IllegalStateException(
+                        "No se pudo generar un código seguro único para la OT");
+            }
+        } while (otRepositorio.existsByCodigoSeguro(codigo));
+        return codigo;
+    }
+
     private OTRespuestaDTO aDTO(OrdenDeTrabajo ot) {
         List<OTRespuestaDTO.ServicioRespuestaDTO> serviciosDTO = ot.getServicios()
                 .stream()
@@ -300,6 +326,8 @@ public class TallerServicio {
 
         return new OTRespuestaDTO(
                 ot.getId(),
+                ot.getNumeroOt(),
+                ot.getCodigoSeguro(),
                 ot.getNombreCliente(),
                 ot.getCelularCliente(),
                 ot.getPlaca(),

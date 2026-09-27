@@ -19,6 +19,14 @@ import java.util.List;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class OrdenDeTrabajo extends EntidadBase {
 
+    // ── Identificadores públicos ──────────────────────
+    // Número formato OT-000001.
+    @Column(name = "numero_ot", insertable = false, updatable = false, length = 20)
+    private String numeroOt;
+
+    @Column(name = "codigo_seguro", nullable = false, unique = true, length = 20)
+    private String codigoSeguro;
+
     // ── Datos del cliente ─────────────
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cliente_id")
