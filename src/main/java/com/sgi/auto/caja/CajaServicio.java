@@ -32,15 +32,25 @@ public class CajaServicio {
 
     // ── Sesión de Caja ────────────────────────────────────────
 
-    // Abre una nueva sesión de caja para el usuario actual.
+    // Abre una nueva sesión de caja. Si la solicitud trae cajeraId, se abre
+    // para ese usuario (caso del dueño abriendo la caja de una cajera);
+    // si no, se abre para quien está autenticado (autoservicio).
     @Transactional
     public SesionCajaRespuestaDTO abrirSesion(AperturaCajaDTO solicitud) {
-        Usuario cajera = obtenerUsuarioActual();
+        boolean abriendoParaOtro = solicitud.cajeraId() != null;
+
+        Usuario cajera = abriendoParaOtro
+                ? usuarioRepositorio.findById(solicitud.cajeraId())
+                .orElseThrow(() -> new RecursoNoEncontradoExcepcion(
+                        "No se encontró el usuario con id: " + solicitud.cajeraId()))
+                : obtenerUsuarioActual();
 
         // Solo puede haber una sesión abierta a la vez POR CAJERA
         sesionCajaRepositorio.buscarSesionAbiertaPorCajera(cajera.getId()).ifPresent(s -> {
             throw new ReglaNegocioExcepcion(
-                    "Ya tienes una sesión de caja abierta. Ciérrela antes de abrir una nueva.");
+                    abriendoParaOtro
+                            ? cajera.getNombreCompleto() + " ya tiene una sesión de caja abierta."
+                            : "Ya tienes una sesión de caja abierta. Ciérrela antes de abrir una nueva.");
         });
 
         SesionCaja sesion = SesionCaja.builder()
