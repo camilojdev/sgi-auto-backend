@@ -42,6 +42,13 @@ public class VentaControlador {
                 ApiRespuesta.exitoso(ventaServicio.obtenerPorId(id)));
     }
 
+    @GetMapping("/codigo/{codigoSeguro}")
+    public ResponseEntity<ApiRespuesta<VentaRespuestaDTO>> obtenerPorCodigoSeguro(
+            @PathVariable String codigoSeguro) {
+        return ResponseEntity.ok(
+                ApiRespuesta.exitoso(ventaServicio.obtenerPorCodigoSeguro(codigoSeguro)));
+    }
+
     @PostMapping("/{id}/anular")
     @PreAuthorize("hasRole('DUENO')")
     public ResponseEntity<ApiRespuesta<VentaRespuestaDTO>> anular(
