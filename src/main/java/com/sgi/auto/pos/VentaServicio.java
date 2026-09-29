@@ -6,6 +6,7 @@ import com.sgi.auto.clientes.ClienteRepositorio;
 import com.sgi.auto.clientes.CreditoRepositorio;
 import com.sgi.auto.clientes.Credito;
 import com.sgi.auto.compartido.ConflictoExcepcion;
+import com.sgi.auto.compartido.GeneradorCodigoSeguro;
 import com.sgi.auto.compartido.RecursoNoEncontradoExcepcion;
 import com.sgi.auto.compartido.ReglaNegocioExcepcion;
 import com.sgi.auto.inventario.MovimientoStock;
@@ -47,9 +48,10 @@ public class VentaServicio {
     private final UsuarioRepositorio usuarioRepositorio;
     private final MovimientoCajaRepositorio movimientoCajaRepositorio;
 
-
     // Regla de negocio: cada COP gastado = 1 punto
     private static final BigDecimal FACTOR_PUNTOS = BigDecimal.ONE;
+
+    private static final int LONGITUD_CODIGO_SEGURO = 8;
 
     @Transactional
     public VentaRespuestaDTO crear(VentaCrearDTO solicitud) {
@@ -64,6 +66,9 @@ public class VentaServicio {
 
         Venta venta = new Venta();
         venta.setClaveIdempotencia(solicitud.claveIdempotencia());
+
+        venta.setCodigoSeguro(generarCodigoSeguroUnico());
+
         venta.setMetodoPago(solicitud.metodoPago());
         venta.setEstado(EstadoVenta.COMPLETADA);
         venta.setDescuentoCop(
@@ -180,8 +185,8 @@ public class VentaServicio {
         }
 
         Venta guardada = ventaRepositorio.save(venta);
-        log.info("Venta creada: id={}, total={}, items={}",
-                guardada.getId(), guardada.getTotalCop(), items.size());
+        log.info("Venta creada: id={}, numeroVenta={}, total={}, items={}",
+                guardada.getId(), guardada.getNumeroVenta(), guardada.getTotalCop(), items.size());
 
         final BigDecimal totalFinal = total;
 
@@ -222,7 +227,10 @@ public class VentaServicio {
                     );
         }
 
-        return aDTO(guardada);
+        // numeroVenta lo rellena un trigger de PostgreSQL DESPUÉS del INSERT;
+        // recargamos para que el DTO (y por lo tanto la factura) lo traigan.
+        Venta ventaConNumero = ventaRepositorio.findById(guardada.getId()).orElse(guardada);
+        return aDTO(ventaConNumero);
     }
 
     //Anula una venta y revierte el stock.
@@ -318,6 +326,15 @@ public class VentaServicio {
                         "No se encontró la venta con id: " + id)));
     }
 
+    // Búsqueda por el código escaneado del código de barras de la factura.
+    @Transactional(readOnly = true)
+    public VentaRespuestaDTO obtenerPorCodigoSeguro(String codigoSeguro) {
+        Venta venta = ventaRepositorio.findByCodigoSeguro(codigoSeguro)
+                .orElseThrow(() -> new RecursoNoEncontradoExcepcion(
+                        "No se encontró ninguna venta con ese código"));
+        return aDTO(venta);
+    }
+
     //Historial de ventas de un cliente.
     @Transactional(readOnly = true)
     public Page<VentaRespuestaDTO> ventasPorCliente(Long clienteId, Pageable pageable) {
@@ -332,6 +349,21 @@ public class VentaServicio {
                 .atStartOfDay()
                 .atOffset(ZoneOffset.of("-05:00"));
         return ventaRepositorio.ventasDeHoy(inicioDia, pageable).map(this::aDTO);
+    }
+
+    // ── Helpers privados ──────────────────────────────────────
+
+    private String generarCodigoSeguroUnico() {
+        String codigo;
+        int intentos = 0;
+        do {
+            codigo = "VTA-" + GeneradorCodigoSeguro.generar(LONGITUD_CODIGO_SEGURO);
+            if (++intentos > 5) {
+                throw new IllegalStateException(
+                        "No se pudo generar un código seguro único para la venta");
+            }
+        } while (ventaRepositorio.existsByCodigoSeguro(codigo));
+        return codigo;
     }
 
     // ── Mapper manual ──
@@ -354,6 +386,8 @@ public class VentaServicio {
 
         return new VentaRespuestaDTO(
                 venta.getId(),
+                venta.getNumeroVenta(),
+                venta.getCodigoSeguro(),
                 venta.getClaveIdempotencia(),
                 nombreCliente,
                 venta.getMetodoPago(),

@@ -26,4 +26,9 @@ public interface VentaRepositorio extends JpaRepository<Venta, Long> {
         ORDER BY v.creadoEn DESC
         """)
     Page<Venta> ventasDeHoy(@Param("inicioDia") OffsetDateTime inicioDia, Pageable pageable);
+
+    // Búsqueda por el código escaneado del código de barras de la factura
+    Optional<Venta> findByCodigoSeguro(String codigoSeguro);
+
+    boolean existsByCodigoSeguro(String codigoSeguro);
 }

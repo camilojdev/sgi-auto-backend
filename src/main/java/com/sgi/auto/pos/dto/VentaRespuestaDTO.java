@@ -9,6 +9,8 @@ import java.util.List;
 
 public record VentaRespuestaDTO(
         Long id,
+        String numeroVenta,
+        String codigoSeguro,
         String claveIdempotencia,
         String nombreCliente,
         MetodoPago metodoPago,

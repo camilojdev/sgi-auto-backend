@@ -18,6 +18,12 @@ import java.util.List;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Venta extends EntidadBase {
 
+    @Column(name = "numero_venta", insertable = false, updatable = false, length = 20)
+    private String numeroVenta;
+
+    @Column(name = "codigo_seguro", nullable = false, unique = true, length = 20)
+    private String codigoSeguro;
+
     // Idempotencia offline
     @Column(name = "clave_idempotencia", unique = true, length = 36)
     private String claveIdempotencia;
