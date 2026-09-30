@@ -61,21 +61,6 @@ public class EtiquetaPdfServicio {
     private static final DeviceRgb NEGRO_TEXTO = new DeviceRgb(0x11, 0x11, 0x11);
     private static final DeviceRgb ROJO_PRECIO = new DeviceRgb(0xE5, 0x24, 0x24);
 
-    /**
-     * Fuente usada ÚNICAMENTE para MEDIR el ancho del texto (contarLineas /
-     * ajustarFontParaAncho) y decidir si hay que achicar la letra del nombre.
-     *
-     * IMPORTANTE: nunca se debe llamar a Paragraph.setFont(FUENTE_NEGRITA) ni
-     * agregar esta instancia a un Document real. iText "ata" el objeto de
-     * fuente al primer PdfDocument en el que se usa; como este campo es
-     * static (se reutiliza entre peticiones, cada una con su propio
-     * PdfDocument nuevo), si se le hace setFont() a un elemento y se agrega al
-     * documento, la SIGUIENTE petición falla con:
-     * "Pdf indirect object belongs to other PDF document". Por eso el
-     * Paragraph del nombre se sigue dibujando con .setBold() (fuente nueva e
-     * independiente en cada documento), y esta fuente aquí solo se usa para
-     * los cálculos de font.getWidth(...).
-     */
     private static final PdfFont FUENTE_NEGRITA = crearFuenteNegrita();
 
     private static PdfFont crearFuenteNegrita() {
@@ -86,9 +71,6 @@ public class EtiquetaPdfServicio {
         }
     }
 
-    // ------------------------------------------------------------------
-    // Definición de un perfil de diseño (una plantilla completa de Canva)
-    // ------------------------------------------------------------------
     private record Perfil(
             String nombre,
             float refAnchoMm, float refAltoMm,
@@ -104,7 +86,6 @@ public class EtiquetaPdfServicio {
     ) {
     }
 
-    /** Página "3x10 en A4" de Canva: 3 columnas x 10 filas, etiqueta de 69.00 x 29.10 mm, logo circular. */
     private static final Perfil PERFIL_3_COLUMNAS = new Perfil(
             "3 columnas (A4_30)",
             69.0000f, 29.1000f,
@@ -116,7 +97,6 @@ public class EtiquetaPdfServicio {
             1.7493f, 24.0378f, 65.8283f, 3.1397f, 10.6667f, 0.92f
     );
 
-    /** Página "4x10 en A4" de Canva: 4 columnas x 10 filas, etiqueta de 51.75 x 29.10 mm, logo rectangular. */
     private static final Perfil PERFIL_4_COLUMNAS = new Perfil(
             "4 columnas (A4_40)",
             51.7245f, 29.1043f,
@@ -178,12 +158,6 @@ public class EtiquetaPdfServicio {
         return salida.toByteArray();
     }
 
-    /**
-     * Elige qué perfil de diseño usar según la cantidad de columnas configurada
-     * en la plantilla. Si algún día agregas una tercera plantilla de Canva con
-     * otra cantidad de columnas, hay que medirla igual que estas dos y añadir
-     * un tercer Perfil aquí.
-     */
     private Perfil seleccionarPerfil(PlantillaEtiqueta plantilla) {
         int columnas = plantilla.getColumnas();
         if (columnas == 3) {
@@ -192,8 +166,7 @@ public class EtiquetaPdfServicio {
         if (columnas == 4) {
             return PERFIL_4_COLUMNAS;
         }
-        // Plantilla térmica u otra configuración: se usa el perfil cuyo ancho de
-        // referencia esté más cerca del ancho configurado, para no romper el PDF.
+
         float anchoMm = plantilla.getAnchoMm().floatValue();
         float distA = Math.abs(anchoMm - PERFIL_3_COLUMNAS.refAnchoMm());
         float distB = Math.abs(anchoMm - PERFIL_4_COLUMNAS.refAnchoMm());
@@ -258,11 +231,6 @@ public class EtiquetaPdfServicio {
         }
     }
 
-    /**
-     * Dibuja un rectángulo punteado del tamaño exacto de la etiqueta, como guía
-     * visual para recortar con tijeras. Solo aplica a la hoja A4 (no a la
-     * plantilla térmica, donde cada página YA es del tamaño exacto de la etiqueta).
-     */
     private void dibujarLineaCorte(PdfDocument pdf, int numeroPagina, Rectangle labelRect) {
         PdfPage page = pdf.getPage(numeroPagina);
         PdfCanvas pdfCanvas = new PdfCanvas(page);
@@ -388,10 +356,6 @@ public class EtiquetaPdfServicio {
         doc.add(codigo);
     }
 
-    /**
-     * Dibuja el logo recortado en círculo (tal como está en la plantilla de 3 columnas
-     * de Canva), usando el canvas de bajo nivel para poder aplicar un clip circular.
-     */
     private void dibujarLogoCircular(PdfDocument pdf, int numeroPagina, Rectangle labelRect,
                                      float leftPt, float topPt, float anchoPt, float altoPt,
                                      String logoUrl) throws Exception {
@@ -411,7 +375,7 @@ public class EtiquetaPdfServicio {
         ImageData imageData = ImageDataFactory.create(logoUrl);
 
         pdfCanvas.saveState();
-        // Aproximación de círculo con 4 curvas Bézier (recorte circular).
+
         float k = 0.5522847498f; // constante de aproximación de círculo con Bézier
         pdfCanvas.moveTo(cx + radioX, cy);
         pdfCanvas.curveTo(cx + radioX, cy + radioY * k, cx + radioX * k, cy + radioY, cx, cy + radioY);
@@ -447,18 +411,6 @@ public class EtiquetaPdfServicio {
         elemento.setHeight(altoPt);
     }
 
-    /**
-     * Posiciona un párrafo de texto dejando el borde superior exactamente en
-     * "topPt" (igual que en Canva), pero con espacio de sobra hacia abajo
-     * (hasta el fondo de la etiqueta) en vez de una caja del alto exacto medido
-     * en Canva. Esto es a propósito: la fuente de PDF (Helvetica) no tiene
-     * exactamente el mismo interlineado que la fuente de Canva, así que si se
-     * fuerza una caja del alto "justo" medido en Canva, iText puede decidir que
-     * el texto no cabe y simplemente NO dibujarlo (esto fue lo que causaba que
-     * el precio oculto y el código no aparecieran). Al dejar espacio de sobra
-     * hacia abajo, el texto sigue naciendo en la misma posición superior, pero
-     * ya no se corre el riesgo de que se descarte por falta de espacio.
-     */
     private void posicionarTexto(Paragraph elemento, int numeroPagina, Rectangle labelRect,
                                  float leftPt, float topPt, float anchoPt) {
 
@@ -471,12 +423,6 @@ public class EtiquetaPdfServicio {
         elemento.setHeight(altoDisponible);
     }
 
-    /**
-     * Cuenta en cuántas líneas quedaría el texto si se ajusta (word-wrap) dentro
-     * de un ancho máximo, con la fuente y tamaño dados. Es una simulación simple
-     * (por palabras) para poder decidir si hay que achicar la letra, sin tener
-     * que crear todavía el Paragraph real dentro del documento.
-     */
     private int contarLineas(String texto, PdfFont font, float fontSizePt, float maxWidthPt) {
         String[] palabras = texto.trim().split("\\s+");
         if (palabras.length == 0 || (palabras.length == 1 && palabras[0].isEmpty())) {
@@ -501,14 +447,6 @@ public class EtiquetaPdfServicio {
         return lineas;
     }
 
-    /**
-     * Va bajando el tamaño de letra (de a medio punto) desde fontInicialPt hasta
-     * que el texto entre en, como máximo, "maxLineas" líneas dentro de
-     * "maxWidthPt". Nunca baja de fontMinimoPt: si ni siquiera al tamaño mínimo
-     * entra en maxLineas, se deja el tamaño mínimo igual (el texto se recortará
-     * visualmente en el peor de los casos, pero la generación del PDF nunca
-     * falla ni se cae por esto).
-     */
     private float ajustarFontParaAncho(String texto, PdfFont font, float fontInicialPt,
                                        float fontMinimoPt, float maxWidthPt, int maxLineas) {
         float fontSize = fontInicialPt;
