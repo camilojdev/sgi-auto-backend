@@ -70,16 +70,22 @@ public class CajaServicio {
         return aDTO(guardada);
     }
 
-    // Cierra la sesión activa del usuario actual y calcula la diferencia.
     @Transactional
     public SesionCajaRespuestaDTO cerrarSesion(CierreCajaDTO solicitud) {
-        Usuario cajera = obtenerUsuarioActual();
 
-        SesionCaja sesion = sesionCajaRepositorio.buscarSesionAbiertaPorCajera(cajera.getId())
-                .orElseThrow(() -> new ReglaNegocioExcepcion(
-                        "No tienes ninguna sesión de caja abierta"));
+        // El dueño puede cerrar la sesión de cualquier cajera
+        SesionCaja sesion = sesionCajaRepositorio.findById(solicitud.sesionId())
+                .orElseThrow(() -> new RecursoNoEncontradoExcepcion(
+                        "No se encontró la sesión de caja con id: " + solicitud.sesionId()));
 
-        // Saldo esperado = inicial + ventas + abonos - gastos - egresos
+        // Verificar que realmente esté abierta
+        if (!sesion.isEstaAbierta()) {
+            throw new ReglaNegocioExcepcion(
+                    "La sesión de caja de " + sesion.getCajera().getNombreCompleto()
+                            + " ya está cerrada.");
+        }
+
+        // Saldo esperado = inicial + ventas + abonos - gastos
         BigDecimal saldoEsperado = sesion.getSaldoInicialCop()
                 .add(sesion.getTotalVentasCop())
                 .add(sesion.getTotalAbonosCreditoCop())
@@ -96,15 +102,17 @@ public class CajaServicio {
 
         SesionCaja cerrada = sesionCajaRepositorio.save(sesion);
 
-        log.info("Sesión de caja cerrada: id={}, diferencia={}",
-                cerrada.getId(), diferencia);
+        log.info(
+                "Sesión de caja cerrada: id={}, cajera={}, cerradaPor={}, diferencia={}",
+                cerrada.getId(),
+                cerrada.getCajera().getNombreCompleto(),
+                obtenerUsuarioActual().getNombreCompleto(),
+                diferencia
+        );
 
-        // Se publica el evento aquí, pero el backup solo se ejecutará
-        // DESPUÉS de que esta transacción confirme por completo en la
-        // base de datos (ver BackupServicio.alCerrarCaja). Así se
-        // garantiza que el backup incluya este cierre, y nunca dispara
-        // si la transacción termina en rollback.
-        eventPublisher.publishEvent(new CajaCerradaEvento(cerrada.getId()));
+        eventPublisher.publishEvent(
+                new CajaCerradaEvento(cerrada.getId())
+        );
 
         return aDTO(cerrada);
     }
