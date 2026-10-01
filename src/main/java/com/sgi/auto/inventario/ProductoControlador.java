@@ -28,7 +28,7 @@ public class ProductoControlador {
     private final BarcodeService barcodeService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('DUENO','CAJERA')")
+    @PreAuthorize("hasRole('DUENO') or (hasRole('CAJERA') and authentication.principal.puedeGestionarInventario)")
     public ResponseEntity<ApiRespuesta<ProductoRespuestaDTO>> crear(
             @Valid @RequestBody ProductoCrearDTO solicitud) {
         return ResponseEntity
@@ -39,11 +39,28 @@ public class ProductoControlador {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('DUENO','CAJERA','MECANICO')")
+    @PreAuthorize("hasAnyRole('DUENO','CAJERA','MECANICO') and " +
+            "(!#incluirInactivos or hasRole('DUENO') or authentication.principal.puedeGestionarInventario)")
     public ResponseEntity<ApiRespuesta<Page<ProductoRespuestaDTO>>> listar(
-            @PageableDefault(size = 20) Pageable pageable) {
+            @PageableDefault(size = 20) Pageable pageable,
+            @RequestParam(defaultValue = "false") boolean incluirInactivos) {
         return ResponseEntity.ok(
-                ApiRespuesta.exitoso(productoServicio.listarTodos(pageable)));
+                ApiRespuesta.exitoso(productoServicio.listarTodos(pageable, incluirInactivos)));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('DUENO') or (hasRole('CAJERA') and authentication.principal.puedeGestionarInventario)")
+    public ResponseEntity<ApiRespuesta<Void>> eliminar(@PathVariable Long id) {
+        productoServicio.desactivarProducto(id);
+        return ResponseEntity.ok(
+                ApiRespuesta.exitoso(null, "Producto desactivado correctamente"));
+    }
+
+    @PatchMapping("/{id}/reactivar")
+    @PreAuthorize("hasRole('DUENO') or (hasRole('CAJERA') and authentication.principal.puedeGestionarInventario)")
+    public ResponseEntity<ApiRespuesta<ProductoRespuestaDTO>> reactivar(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiRespuesta.exitoso(
+                productoServicio.reactivarProducto(id), "Producto reactivado correctamente"));
     }
 
     @GetMapping("/{id}")
@@ -87,14 +104,6 @@ public class ProductoControlador {
                 ApiRespuesta.exitoso(
                         productoServicio.actualizarProducto(id, solicitud),
                         "Producto actualizado correctamente"));
-    }
-
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('DUENO')")
-    public ResponseEntity<ApiRespuesta<Void>> eliminar(@PathVariable Long id) {
-        productoServicio.desactivarProducto(id);
-        return ResponseEntity.ok(
-                ApiRespuesta.exitoso(null, "Producto eliminado correctamente"));
     }
 
     @PostMapping("/{id}/ajustar-stock")

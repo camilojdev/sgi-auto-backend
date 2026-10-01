@@ -48,4 +48,7 @@ public interface ProductoRepositorio extends JpaRepository<Producto, Long> {
 
     @Query("SELECT p FROM Producto p WHERE p.estaActivo = true AND p.eliminadoEn IS NULL AND p.mostrarEnListaPrecios = true ORDER BY p.nombre")
     List<Producto> listarParaListaPrecios();
+
+    @Query("SELECT p FROM Producto p WHERE p.eliminadoEn IS NULL ORDER BY p.nombre")
+    Page<Producto> listarTodosIncluyendoInactivos(Pageable pageable);
 }

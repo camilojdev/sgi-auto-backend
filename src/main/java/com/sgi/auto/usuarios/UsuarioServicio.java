@@ -101,6 +101,7 @@ public class UsuarioServicio {
         usuario.setPuedeCerrarCaja(permisos.puedeCerrarCaja());
         usuario.setPuedeVerReportes(permisos.puedeVerReportes());
         usuario.setPuedeGestionarCredito(permisos.puedeGestionarCredito());
+        usuario.setPuedeGestionarInventario(permisos.puedeGestionarInventario());
 
         Usuario actualizado = usuarioRepositorio.save(usuario);
         log.info("Permisos actualizados para usuario: nombreUsuario={}", actualizado.getNombreUsuario());
