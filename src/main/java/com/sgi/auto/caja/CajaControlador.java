@@ -24,7 +24,7 @@ public class CajaControlador {
     private final CajaServicio cajaServicio;
 
     @PostMapping("/abrir")
-    @PreAuthorize("hasRole('DUENO')")
+    @PreAuthorize("hasRole('DUENO') or (hasRole('CAJERA') and authentication.principal.puedeCerrarCaja)")
     public ResponseEntity<ApiRespuesta<SesionCajaRespuestaDTO>> abrir(
             @Valid @RequestBody AperturaCajaDTO solicitud) {
         return ResponseEntity.ok(ApiRespuesta.exitoso(
@@ -33,7 +33,7 @@ public class CajaControlador {
     }
 
     @PostMapping("/cerrar")
-    @PreAuthorize("hasRole('DUENO')")
+    @PreAuthorize("hasRole('DUENO') or (hasRole('CAJERA') and authentication.principal.puedeCerrarCaja)")
     public ResponseEntity<ApiRespuesta<SesionCajaRespuestaDTO>> cerrar(
             @Valid @RequestBody CierreCajaDTO solicitud) {
         return ResponseEntity.ok(ApiRespuesta.exitoso(

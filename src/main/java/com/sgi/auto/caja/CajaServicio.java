@@ -5,6 +5,7 @@ import com.sgi.auto.compartido.RecursoNoEncontradoExcepcion;
 import com.sgi.auto.compartido.ReglaNegocioExcepcion;
 import com.sgi.auto.usuarios.Usuario;
 import com.sgi.auto.usuarios.UsuarioRepositorio;
+import com.sgi.auto.usuarios.RolUsuario;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -32,18 +33,23 @@ public class CajaServicio {
 
     // ── Sesión de Caja ────────────────────────────────────────
 
-    // Abre una nueva sesión de caja. Si la solicitud trae cajeraId, se abre
-    // para ese usuario (caso del dueño abriendo la caja de una cajera);
-    // si no, se abre para quien está autenticado (autoservicio).
     @Transactional
     public SesionCajaRespuestaDTO abrirSesion(AperturaCajaDTO solicitud) {
+        Usuario usuarioActual = obtenerUsuarioActual();
         boolean abriendoParaOtro = solicitud.cajeraId() != null;
+
+        // Una cajera con permiso solo puede abrir su propia sesión, nunca la de otra persona
+        if (usuarioActual.getRol() == RolUsuario.CAJERA
+                && abriendoParaOtro
+                && !solicitud.cajeraId().equals(usuarioActual.getId())) {
+            throw new ReglaNegocioExcepcion("Solo puedes abrir tu propia sesión de caja");
+        }
 
         Usuario cajera = abriendoParaOtro
                 ? usuarioRepositorio.findById(solicitud.cajeraId())
                 .orElseThrow(() -> new RecursoNoEncontradoExcepcion(
                         "No se encontró el usuario con id: " + solicitud.cajeraId()))
-                : obtenerUsuarioActual();
+                : usuarioActual;
 
         // Solo puede haber una sesión abierta a la vez POR CAJERA
         sesionCajaRepositorio.buscarSesionAbiertaPorCajera(cajera.getId()).ifPresent(s -> {
@@ -73,19 +79,24 @@ public class CajaServicio {
     @Transactional
     public SesionCajaRespuestaDTO cerrarSesion(CierreCajaDTO solicitud) {
 
-        // El dueño puede cerrar la sesión de cualquier cajera
         SesionCaja sesion = sesionCajaRepositorio.findById(solicitud.sesionId())
                 .orElseThrow(() -> new RecursoNoEncontradoExcepcion(
                         "No se encontró la sesión de caja con id: " + solicitud.sesionId()));
 
-        // Verificar que realmente esté abierta
+        Usuario usuarioActual = obtenerUsuarioActual();
+
+        // Una cajera con permiso solo puede cerrar su propia sesión, nunca la de otra persona
+        if (usuarioActual.getRol() == RolUsuario.CAJERA
+                && !sesion.getCajera().getId().equals(usuarioActual.getId())) {
+            throw new ReglaNegocioExcepcion("Solo puedes cerrar tu propia sesión de caja");
+        }
+
         if (!sesion.isEstaAbierta()) {
             throw new ReglaNegocioExcepcion(
                     "La sesión de caja de " + sesion.getCajera().getNombreCompleto()
                             + " ya está cerrada.");
         }
 
-        // Saldo esperado = inicial + ventas + abonos - gastos
         BigDecimal saldoEsperado = sesion.getSaldoInicialCop()
                 .add(sesion.getTotalVentasCop())
                 .add(sesion.getTotalAbonosCreditoCop())
@@ -106,7 +117,7 @@ public class CajaServicio {
                 "Sesión de caja cerrada: id={}, cajera={}, cerradaPor={}, diferencia={}",
                 cerrada.getId(),
                 cerrada.getCajera().getNombreCompleto(),
-                obtenerUsuarioActual().getNombreCompleto(),
+                usuarioActual.getNombreCompleto(),
                 diferencia
         );
 
@@ -116,7 +127,6 @@ public class CajaServicio {
 
         return aDTO(cerrada);
     }
-
     // Obtiene la sesión abierta del usuario actual.
     @Transactional(readOnly = true)
     public SesionCajaRespuestaDTO obtenerSesionActual() {
