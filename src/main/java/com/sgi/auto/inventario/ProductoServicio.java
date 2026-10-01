@@ -88,10 +88,21 @@ public class ProductoServicio {
         log.info("Producto desactivado: id={}, nombre={}", id, producto.getNombre());
     }
 
+    @Transactional
+    public ProductoRespuestaDTO reactivarProducto(Long id) {
+        Producto producto = buscarProductoOLanzar(id);
+        producto.setEstaActivo(true);
+        Producto actualizado = productoRepositorio.save(producto);
+        log.info("Producto reactivado: id={}, nombre={}", id, producto.getNombre());
+        return productoMapper.aDTO(actualizado);
+    }
+
     @Transactional(readOnly = true)
-    public Page<ProductoRespuestaDTO> listarTodos(Pageable pageable) {
-        return productoRepositorio.listarActivos(pageable)
-                .map(productoMapper::aDTO);
+    public Page<ProductoRespuestaDTO> listarTodos(Pageable pageable, boolean incluirInactivos) {
+        Page<Producto> pagina = incluirInactivos
+                ? productoRepositorio.listarTodosIncluyendoInactivos(pageable)
+                : productoRepositorio.listarActivos(pageable);
+        return pagina.map(productoMapper::aDTO);
     }
 
     @Transactional(readOnly = true)

@@ -61,7 +61,8 @@ public class AuthServicio {
                 "puedeAnularVenta",      usuario.isPuedeAnularVenta(),
                 "puedeCerrarCaja",       usuario.isPuedeCerrarCaja(),
                 "puedeVerReportes",      usuario.isPuedeVerReportes(),
-                "puedeGestionarCredito", usuario.isPuedeGestionarCredito()
+                "puedeGestionarCredito", usuario.isPuedeGestionarCredito(),
+                "puedeGestionarInventario", usuario.isPuedeGestionarInventario()
         );
 
         String token = jwtUtil.generarToken(

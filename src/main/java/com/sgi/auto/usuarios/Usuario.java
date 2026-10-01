@@ -68,6 +68,10 @@ public class Usuario extends EntidadBase implements UserDetails {
     @Builder.Default
     private boolean puedeGestionarCredito = false;
 
+    @Column(name = "puede_gestionar_inventario", nullable = false)
+    @Builder.Default
+    private boolean puedeGestionarInventario = false;
+
     // ── Control de acceso ─────────────────────────────────────────
     @Column(name = "esta_activo", nullable = false)
     @Builder.Default
