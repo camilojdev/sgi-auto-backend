@@ -5,5 +5,6 @@ public record PermisosActualizarDTO(
         boolean puedeAnularVenta,
         boolean puedeCerrarCaja,
         boolean puedeVerReportes,
-        boolean puedeGestionarCredito
+        boolean puedeGestionarCredito,
+        boolean puedeGestionarInventario
 ) {}
